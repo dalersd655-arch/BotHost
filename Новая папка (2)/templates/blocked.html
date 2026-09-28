@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⛔ Доступ ограничен - Astrix Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .blocked-box {
+      max-width: 520px;
+      margin: 4rem auto;
+      background: var(--bg-secondary);
+      border: 1px solid var(--danger-color);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(248, 81, 73, 0.15);
+    }
+    .icon-lock {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="blocked-box">
+    <div class="icon-lock">🔒</div>
+    <h2 style="color: var(--danger-color); margin-bottom: 0.8rem;">Доступ к хостингу приостановлен</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.6;">
+      Бесплатный облачный хостинг ботов предоставляется только активным подписчикам официального канала проекта.
+    </p>
+
+    <div style="background: var(--bg-card); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border-color);">
+      <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 4px;">Обязательный канал:</div>
+      <a href="{{ channel_url }}" target="_blank" style="color: #58a6ff; font-weight: 600; font-size: 1.1rem; text-decoration: none;">
+        👉 {{ required_channel }}
+      </a>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <a href="{{ channel_url }}" target="_blank" class="btn btn-primary" style="padding: 0.8rem;">
+        📢 Перейти и подписаться
+      </a>
+      <button id="btnCheckSub" class="btn btn-success" style="padding: 0.8rem;" onclick="checkSubscriptionNow()">
+        ✅ Проверить подписку
+      </button>
+      <a href="/logout" class="btn btn-secondary" style="margin-top: 10px; font-size: 0.85rem;">
+        Сменить аккаунт / Выйти
+      </a>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

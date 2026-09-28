@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚀 Панель хостинга ботов</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <header class="navbar">
+    <a href="/" class="brand">
+      <span>🚀 Telegram Bot Hosting</span>
+      <span class="badge">v2.0</span>
+    </a>
+    <div class="nav-actions">
+      {% if user.is_admin %}
+      <a href="/admin" class="btn btn-secondary" style="font-size:0.8rem;">👑 Админ-панель</a>
+      {% endif %}
+      <div class="user-pill">
+        <span>👤 {{ user.first_name or user.username or "Пользователь" }}</span>
+        {% if user.is_admin %}
+        <span style="color:#d29922; font-weight:bold;">[Admin]</span>
+        {% endif %}
+      </div>
+      <a href="/logout" class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;">Выход</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Channel Banner -->
+    <div class="banner">
+      <div>
+        <strong>Канал проекта: <a href="{{ channel_url }}" target="_blank" style="color:#58a6ff; text-decoration:none;">{{ required_channel }}</a></strong>
+        <p style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">
+          Ваша подписка активна ✅ Доступ к хостингу полностью открыт.
+        </p>
+      </div>
+      <div>
+        <a href="{{ channel_url }}" target="_blank" class="btn btn-secondary" style="font-size:0.85rem;">📢 Канал новостей</a>
+      </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Всего ваших ботов</span>
+        <div class="stat-value">
+          <span>🤖 {{ bots|length }}</span>
+          <span style="font-size:0.9rem; color:var(--text-muted); font-weight:normal;">/ {{ user.bots_limit }} лимит</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Режим изоляции</span>
+        <div class="stat-value" style="font-size:1.15rem; color: {% if docker_available %}#3fb950{% else %}#58a6ff{% endif %};">
+          {% if docker_available %}
+          🐳 Docker Containers
+          {% else %}
+          ⚡ Изолированные процессы
+          {% endif %}
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Статус подписки</span>
+        <div class="stat-value" style="color:#3fb950; font-size:1.15rem;">
+          Активна (Astrix Studio)
+        </div>
+      </div>
+    </div>
+
+    <!-- Section Header -->
+    <div class="section-header">
+      <h2>Ваши боты</h2>
+      {% if bots|length < user.bots_limit %}
+      <button class="btn btn-primary" onclick="openModal('createBotModal')">+ Добавить бота</button>
+      {% else %}
+      <button class="btn btn-secondary" disabled title="Лимит ботов исчерпан">+ Достигнут лимит</button>
+      {% endif %}
+    </div>
+
+    <!-- Bots List -->
+    {% if bots|length == 0 %}
+    <div class="empty-state">
+      <h3>У вас пока нет добавленных ботов</h3>
+      <p style="margin: 0.8rem 0 1.2rem;">Нажмите кнопку ниже, чтобы запустить свой первый проект за 30 секунд!</p>
+      <button class="btn btn-primary" onclick="openModal('createBotModal')">🚀 Создать первого бота</button>
+    </div>
+    {% else %}
+    <div class="bots-grid">
+      {% for bot in bots %}
+      <div class="bot-card">
+        <div class="bot-header">
+          <div class="bot-title">{{ bot.name }}</div>
+          <span class="status-badge status-{{ bot.status }}">{{ bot.status }}</span>
+        </div>
+
+        <div class="bot-info">
+          <div><strong>ID:</strong> #{{ bot.id }}</div>
+          <div><strong>Токен:</strong> {{ bot.bot_token[:10] }}...{{ bot.bot_token[-4:] }}</div>
+          {% if bot.container_id %}
+          <div><strong>Контейнер:</strong> <code>{{ bot.container_id }}</code></div>
+          {% endif %}
+          <div><strong>Создан:</strong> {{ bot.created_at[:16] }}</div>
+        </div>
+
+        <div class="bot-actions">
+          {% if bot.status == 'RUNNING' %}
+          <button id="btn-stop-{{ bot.id }}" class="btn btn-danger" style="font-size:0.8rem;" onclick="stopBot({{ bot.id }})">⏹ Стоп</button>
+          <button id="btn-restart-{{ bot.id }}" class="btn btn-secondary" style="font-size:0.8rem;" onclick="restartBot({{ bot.id }})">🔄 Рестарт</button>
+          {% else %}
+          <button id="btn-start-{{ bot.id }}" class="btn btn-success" style="font-size:0.8rem;" onclick="startBot({{ bot.id }})">🚀 Запустить</button>
+          {% endif %}
+          <button class="btn btn-secondary" style="font-size:0.8rem;" onclick="openLogsModal({{ bot.id }}, '{{ bot.name }}')">📜 Логи</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem;" onclick="openFilesModal({{ bot.id }}, '{{ bot.name }}')">📁 Файлы</button>
+          <button class="btn btn-secondary" style="font-size:0.8rem; color:#f85149;" onclick="deleteBot({{ bot.id }}, '{{ bot.name }}')">🗑</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </main>
+
+  <!-- Create Bot Modal -->
+  <div id="createBotModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Добавить нового бота</h3>
+        <button class="btn btn-secondary" style="padding:2px 8px;" onclick="closeModal('createBotModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="createBotName">Название бота:</label>
+          <input type="text" id="createBotName" class="form-control" placeholder="Например: Мой Магазин Бот">
+        </div>
+        <div class="form-group">
+          <label for="createBotToken">Telegram Bot Token (из @BotFather):</label>
+          <input type="text" id="createBotToken" class="form-control" placeholder="123456789:AAHk...">
+          <small style="color:var(--text-muted); display:block; margin-top:4px;">
+            Создается бот со стартовым шаблоном на aiogram 3. Вы сможете изменить код или загрузить свои файлы.
+          </small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('createBotModal')">Отмена</button>
+        <button id="btnSubmitCreate" class="btn btn-primary" onclick="submitCreateBot()">Создать и настроить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logs Modal -->
+  <div id="logsModal" class="modal-overlay">
+    <div class="modal-content" style="max-width:800px;">
+      <div class="modal-header">
+        <h3 id="logsBotTitle">Логи бота</h3>
+        <div>
+          <button class="btn btn-secondary" style="font-size:0.75rem; padding:4px 8px; margin-right:8px;" onclick="fetchLogs()">🔄 Обновить</button>
+          <button class="btn btn-secondary" style="padding:2px 8px;" onclick="closeModal('logsModal')">✕</button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding:0.8rem;">
+        <div id="logsTerminal" class="terminal-logs">Загрузка логов...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Files Modal -->
+  <div id="filesModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="filesBotTitle">Файлы проекта</h3>
+        <button class="btn btn-secondary" style="padding:2px 8px;" onclick="closeModal('filesModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="margin-bottom:1.2rem; background:var(--bg-card); padding:1rem; border-radius:8px;">
+          <h4 style="font-size:0.9rem; margin-bottom:0.5rem;">Загрузить файл или проект (ZIP):</h4>
+          <div style="display:flex; gap:8px;">
+            <input type="file" id="botFileInput" class="form-control" style="flex:1;">
+            <button id="btnUploadFile" class="btn btn-primary" onclick="uploadBotFiles()">Загрузить</button>
+          </div>
+          <small style="color:var(--text-muted); display:block; margin-top:4px;">
+            Вы можете загрузить как одиночные файлы (например, main.py, requirements.txt), так и полный ZIP-архив с проектом.
+          </small>
+        </div>
+
+        <h4 style="font-size:0.9rem; margin-bottom:0.5rem;">Текущие файлы:</h4>
+        <div id="filesList">Загрузка...</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('filesModal')">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

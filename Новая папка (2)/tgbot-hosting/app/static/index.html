@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot Hosting</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--card:#f5f5f7;--mut:#6b6b76;--acc:#2a7de1;--bad:#d64545;--ok:#2e9e5b}
+@media(prefers-color-scheme:dark){:root{--bg:#141417;--fg:#ececf0;--card:#1f1f24;--mut:#9a9aa6}}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--fg)}
+main{max-width:760px;margin:0 auto;padding:20px}
+h1{font-size:20px;margin:0 0 16px}.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{flex:1}.mut{color:var(--mut);font-size:13px}
+button,input{font:inherit;border-radius:8px;border:1px solid #8884;padding:7px 12px;background:var(--bg);color:var(--fg)}
+button{cursor:pointer}button.p{background:var(--acc);color:#fff;border:0}button.d{color:var(--bad)}
+input[type=text],input[type=password]{width:100%;margin-bottom:8px}
+.st{font-size:12px;padding:2px 8px;border-radius:99px;background:#8883}.st.running{background:var(--ok);color:#fff}.st.error{background:var(--bad);color:#fff}
+pre{background:#000;color:#ddd;padding:10px;border-radius:8px;max-height:280px;overflow:auto;font-size:12px;white-space:pre-wrap}
+.hide{display:none}
+</style>
+</head>
+<body><main>
+<h1>🤖 Bot Hosting</h1>
+<div id="login" class="card hide"><p id="loginMsg">Войдите через Telegram:</p><div id="widget"></div>
+  <div id="dev" class="hide"><div class="mut" style="margin-bottom:8px">🧪 Тестовый режим: введите свой Telegram ID (узнать: @userinfobot). Подписка на канал всё равно проверяется.</div><div class="row"><input id="devId" type="text" inputmode="numeric" placeholder="Telegram ID" style="max-width:220px;margin:0"><button class="p" onclick="location='/auth/dev?id='+encodeURIComponent($('devId').value.trim())">Войти</button></div></div></div>
+<div id="app" class="hide">
+  <div class="card row"><div><b id="uname"></b><div class="mut" id="quota"></div></div><span class="sp"></span>
+    <button class="p" onclick="toggle('addForm')">＋ Добавить бота</button>
+    <button onclick="doLogout()">Выйти</button></div>
+  <div id="addForm" class="card hide">
+    <input id="bName" type="text" placeholder="Название проекта" maxlength="40">
+    <input id="bToken" type="password" placeholder="Bot Token от @BotFather" autocomplete="off">
+    <input id="bFile" type="file" accept=".zip" style="margin-bottom:8px"><div class="mut" style="margin-bottom:8px">ZIP с main.py в корне (+ requirements.txt). Токен доступен в коде как переменная окружения BOT_TOKEN.</div>
+    <button class="p" onclick="createBot()">Загрузить и запустить</button> <span id="addErr" class="mut"></span>
+  </div>
+  <div id="bots"></div>
+  <div id="logBox" class="card hide"><div class="row"><b id="logTitle">Логи</b><span class="sp"></span><button onclick="hideLogs()">Закрыть</button></div><pre id="logs"></pre></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let logId=null,timer=null;
+const toggle=id=>$(id).classList.toggle('hide');
+async function api(url,opt){const r=await fetch(url,opt);if(!r.ok){let d='';try{d=(await r.json()).detail}catch{}throw {code:r.status,msg:d}}return r.json()}
+async function init(){
+  try{const me=await api('/api/me');show(me);}
+  catch(e){
+    const cfg=await api('/api/config');$('login').classList.remove('hide');$('app').classList.add('hide');
+    if(e.msg==='not_subscribed')$('loginMsg').innerHTML=`Нужна подписка на <a href="${cfg.channel_url}" target="_blank">канал</a>. Подпишитесь и <a href="/">обновите страницу</a>.`;
+    else if(e.msg==='blocked')$('loginMsg').textContent='Доступ заблокирован.';
+    if(cfg.dev&&e.msg!=='blocked'){$('dev').classList.remove('hide')}
+    else if(e.msg!=='blocked'&&!$('widget').children.length){const s=document.createElement('script');s.src='https://telegram.org/js/telegram-widget.js?22';
+      s.dataset.telegramLogin=cfg.bot;s.dataset.size='large';s.dataset.authUrl='/auth/telegram';s.dataset.requestAccess='write';s.async=true;$('widget').appendChild(s)}
+  }
+}
+function show(me){$('login').classList.add('hide');$('app').classList.remove('hide');
+  $('uname').textContent='@'+(me.username||me.id);
+  $('quota').textContent=`Ботов: ${me.bots}/${me.max_bots} · RAM: ${me.ram_used_mb}/${me.ram_limit_mb} МБ`;loadBots();clearInterval(timer);timer=setInterval(()=>{loadBots();if(logId)loadLogs()},5000)}
+async function loadBots(){
+  const bots=await api('/api/bots');
+  $('bots').innerHTML=bots.map(b=>`<div class="card"><div class="row"><b>${esc(b.name)}</b><span class="st ${b.status}">${b.status}</span><span class="sp"></span>
+    <button onclick="act(${b.id},'start')">▶</button><button onclick="act(${b.id},'stop')">■</button><button onclick="act(${b.id},'restart')">↻</button>
+    <button onclick="showLogs(${b.id},'${esc(b.name)}')">Логи</button><button class="d" onclick="del(${b.id})">✕</button></div>
+    ${b.error?`<div class="mut">${esc(b.error)}</div>`:''}</div>`).join('')||'<div class="mut">Ботов пока нет.</div>'}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function act(id,a){try{await api(`/api/bots/${id}/${a}`,{method:'POST'})}catch(e){alert(e.msg)}loadBots()}
+async function del(id){if(!confirm('Удалить бота и его файлы?'))return;await api(`/api/bots/${id}`,{method:'DELETE'});loadBots()}
+async function createBot(){
+  const f=new FormData();f.append('name',$('bName').value);f.append('token',$('bToken').value);f.append('file',$('bFile').files[0]||new Blob());
+  $('addErr').textContent='Загрузка…';
+  try{await api('/api/bots',{method:'POST',body:f});$('addErr').textContent='';$('bToken').value='';toggle('addForm');init()}catch(e){$('addErr').textContent=e.msg||'Ошибка'}}
+function showLogs(id,name){logId=id;$('logTitle').textContent='Логи: '+name;$('logBox').classList.remove('hide');loadLogs()}
+function hideLogs(){logId=null;$('logBox').classList.add('hide')}
+async function loadLogs(){const r=await api(`/api/bots/${logId}/logs`);$('logs').textContent=r.logs}
+async function doLogout(){await fetch('/auth/logout',{method:'POST'});location.reload()}
+init();
+</script>
+</main></body></html>

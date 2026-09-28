@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: telegram-bot-hosting
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        value: 8667399994:AAFK1Dae6Z9ydaK7akg1oWzaJSKnq5GsIEI
+      - key: ADMIN_IDS
+        value: "8817670262"
+      - key: REQUIRED_CHANNEL
+        value: "@AstrixStudio"
+      - key: CHANNEL_URL
+        value: "https://t.me/AstrixStudio"
+      - key: WEB_HOST
+        value: 0.0.0.0
+      - key: WEB_PORT
+        value: 8080
+      - key: DEFAULT_BOTS_LIMIT
+        value: "3"

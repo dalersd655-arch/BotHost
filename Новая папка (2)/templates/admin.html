@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👑 Админ-панель хостинга</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .table-responsive {
+      overflow-x: auto;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-color);
+    }
+    th {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <a href="/admin" class="brand">
+      <span>👑 Админ-панель хостинга</span>
+    </a>
+    <div class="nav-actions">
+      <a href="/" class="btn btn-secondary" style="font-size:0.85rem;">← В пользовательскую панель</a>
+      <div class="user-pill">
+        <span>👤 {{ user.first_name or user.username }} [Admin]</span>
+      </div>
+      <a href="/logout" class="btn btn-secondary" style="padding:4px 10px; font-size:0.8rem;">Выход</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Всего пользователей</span>
+        <div class="stat-value">👥 {{ users|length }}</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Всего ботов в системе</span>
+        <div class="stat-value">🤖 {{ bots|length }}</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Docker Daemon</span>
+        <div class="stat-value" style="color: {% if docker_available %}#3fb950{% else %}#d29922{% endif %}; font-size:1.1rem;">
+          {% if docker_available %}Доступен (Контейнеры){% else %}Локальный процесс-раннер{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Management -->
+    <div class="section-header">
+      <h2>👥 Управление пользователями</h2>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Telegram ID</th>
+            <th>Имя / Username</th>
+            <th>Подписка</th>
+            <th>Лимит</th>
+            <th>Ботов</th>
+            <th>Статус</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>#{{ u.id }}</td>
+            <td><code>{{ u.telegram_id }}</code></td>
+            <td>{{ u.first_name or "—" }} {% if u.username %}(@{{ u.username }}){% endif %}</td>
+            <td>
+              {% if u.is_subscribed %}
+              <span style="color:#3fb950;">✅ Активна</span>
+              {% else %}
+              <span style="color:#f85149;">❌ Отсутствует</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ u.bots_limit }}</strong></td>
+            <td>{{ u.bots_count }}</td>
+            <td>
+              {% if u.is_blocked %}
+              <span style="color:#f85149; font-weight:bold;">Заблокирован</span>
+              {% else %}
+              <span style="color:#3fb950;">Активен</span>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-secondary" style="font-size:0.75rem; padding:3px 8px;" onclick="adminChangeLimit({{ u.id }}, {{ u.bots_limit }})">
+                Лимит
+              </button>
+              {% if u.is_blocked %}
+              <button class="btn btn-success" style="font-size:0.75rem; padding:3px 8px;" onclick="adminToggleBlock({{ u.id }}, true)">
+                Разблокировать
+              </button>
+              {% else %}
+              <button class="btn btn-danger" style="font-size:0.75rem; padding:3px 8px;" onclick="adminToggleBlock({{ u.id }}, false)">
+                Бан
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bots Management -->
+    <div class="section-header">
+      <h2>🤖 Все боты в системе</h2>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Bot ID</th>
+            <th>Название</th>
+            <th>Владелец</th>
+            <th>Статус</th>
+            <th>Контейнер / PID</th>
+            <th>Создан</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bots %}
+          <tr>
+            <td>#{{ b.id }}</td>
+            <td><strong>{{ b.name }}</strong></td>
+            <td><code>{{ b.telegram_id }}</code> (@{{ b.username or "—" }})</td>
+            <td><span class="status-badge status-{{ b.status }}">{{ b.status }}</span></td>
+            <td><code>{{ b.container_id or "—" }}</code></td>
+            <td>{{ b.created_at[:16] }}</td>
+            <td>
+              {% if b.status == 'RUNNING' %}
+              <button class="btn btn-danger" style="font-size:0.75rem; padding:3px 8px;" onclick="adminForceStopBot({{ b.id }})">Остановить</button>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- System Logs -->
+    <div class="section-header">
+      <h2>📜 Системные события хостинга</h2>
+    </div>
+    <div class="table-responsive" style="max-height:300px; padding:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Время</th>
+            <th>Уровень</th>
+            <th>Бот</th>
+            <th>Сообщение</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in logs %}
+          <tr>
+            <td style="color:var(--text-muted); font-size:0.8rem;">{{ l.created_at[:19] }}</td>
+            <td>
+              {% if l.level == 'ERROR' %}
+              <span style="color:#f85149; font-weight:bold;">ERROR</span>
+              {% else %}
+              <span style="color:#388bfd;">INFO</span>
+              {% endif %}
+            </td>
+            <td>{% if l.bot_id %}#{{ l.bot_id }}{% else %}—{% endif %}</td>
+            <td>{{ l.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
